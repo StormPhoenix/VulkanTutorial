@@ -8,3 +8,7 @@ build_ebook.log
 temp_ebook.md
 ebook/*.pdf
 ebook/*.epub
+
+**/cmake-build-debug/*
+**/cmake-build-release/*
+**/.idea/*
