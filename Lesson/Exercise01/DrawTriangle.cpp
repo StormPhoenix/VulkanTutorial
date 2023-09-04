@@ -427,8 +427,8 @@ private:
     }
 
     void createGraphicsPipeline() {
-        auto vertShaderCode = readFile("./Build/Shaders/ShaderDrawTriangle_Vert.spv");
-        auto fragShaderCode = readFile("./Build/Shaders/ShaderDrawTriangle_Frag.spv");
+        auto vertShaderCode = readFile("./Shaders/ShaderDrawTriangle_Vert.spv");
+        auto fragShaderCode = readFile("./Shaders/ShaderDrawTriangle_Frag.spv");
 
         VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
         VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
