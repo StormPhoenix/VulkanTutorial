@@ -430,26 +430,46 @@ private:
         auto vertShaderCode = readFile("./Shaders/ShaderDrawTriangle_Vert.spv");
         auto fragShaderCode = readFile("./Shaders/ShaderDrawTriangle_Frag.spv");
 
+        /**
+         * VkShaderModule
+         * 创建着色器
+         * **/
         VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
         VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
 
+        /**
+         * VkPipelineShaderStateCreateInfo
+         * 设置着色器在硬件渲染管线中位于哪一阶段
+         * **/
         VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
         vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        // 设置为 VertexShader
         vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
         vertShaderStageInfo.module = vertShaderModule;
+        // 指定 VertexShader 代码入口函数名
         vertShaderStageInfo.pName = "main";
 
         VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
         fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        // 设置为 FragmentShader
         fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
         fragShaderStageInfo.module = fragShaderModule;
+        // 指定 FragmentShader 代码入口函数名
         fragShaderStageInfo.pName = "main";
 
         VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
+        /**
+         * VkPipelineVertexInputStateCreateInfo
+         * 设置传入到 VertexShader 中的顶点数据 VertexBuffer 格式，该结构描述了两种信息：
+         * 1. Bindings: VertexBuffer 中每一项数据之间的间隔与数据是 per-vertex 还是 per-instance
+         * 2. Attribute descriptions: 描述 VertexShader 输入的每一项数据的类型和在 VertexBuffer 中的偏移
+         * **/
         VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        // 设置 Bindings 属性，本代码没有输入顶点数据，所以设置为 0
         vertexInputInfo.vertexBindingDescriptionCount = 0;
+        // 设置 Attribute descriptions 属性，本代码没有输入顶点数据，所以设置为 0
         vertexInputInfo.vertexAttributeDescriptionCount = 0;
 
         VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
@@ -692,6 +712,8 @@ private:
     VkShaderModule createShaderModule(const std::vector<char>& code) {
         VkShaderModuleCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+
+        // 两个关键参数：着色器代码的字节数据和长度
         createInfo.codeSize = code.size();
         createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
 
