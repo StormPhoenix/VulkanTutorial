@@ -430,17 +430,17 @@ private:
         auto vertShaderCode = readFile("./Shaders/ShaderDrawTriangle_Vert.spv");
         auto fragShaderCode = readFile("./Shaders/ShaderDrawTriangle_Frag.spv");
 
-        /**
+        /** **********************************************
          * VkShaderModule
          * 创建着色器
-         * **/
+         * *********************************************** **/
         VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
         VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
 
-        /**
+        /** **********************************************
          * VkPipelineShaderStateCreateInfo
          * 设置着色器在硬件渲染管线中位于哪一阶段
-         * **/
+         * *********************************************** **/
         VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
         vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         // 设置为 VertexShader
@@ -459,12 +459,14 @@ private:
 
         VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
-        /**
+        /** **********************************************
+         * 配置顶点数据(VertexBuffer)内的数据结构，把顶点数据和顶点着色器的输入匹配起来
+         *
          * VkPipelineVertexInputStateCreateInfo
          * 设置传入到 VertexShader 中的顶点数据 VertexBuffer 格式，该结构描述了两种信息：
          * 1. Bindings: VertexBuffer 中每一项数据之间的间隔与数据是 per-vertex 还是 per-instance
          * 2. Attribute descriptions: 描述 VertexShader 输入的每一项数据的类型和在 VertexBuffer 中的偏移
-         * **/
+         * *********************************************** **/
         VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
         // 设置 Bindings 属性，本代码没有输入顶点数据，所以设置为 0
@@ -472,35 +474,84 @@ private:
         // 设置 Attribute descriptions 属性，本代码没有输入顶点数据，所以设置为 0
         vertexInputInfo.vertexAttributeDescriptionCount = 0;
 
+        /** **********************************************
+         * 配置顶点数据(VertexBuffer)拓扑结构
+         *
+         * VkPipelineInputAssemblyStateCreateInfo
+         * 指定 VertexBuffer 的顶点的拓扑结构，这里表示每三个点组成一个三角形
+         * *********************************************** **/
         VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
         inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
         inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         inputAssembly.primitiveRestartEnable = VK_FALSE;
 
+        /** **********************************************
+         * 配置有几个 Viewport
+         *
+         * VkPipelineViewportStateCreateInfo
+         * 告知渲染管线要绘制几个窗口，即 Viewport 的数量
+         * *********************************************** **/
         VkPipelineViewportStateCreateInfo viewportState{};
         viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+        // 指定 viewport 数量
         viewportState.viewportCount = 1;
         viewportState.scissorCount = 1;
 
+        /** **********************************************
+         * 配置如何对几何体进行光栅化
+         *
+         * VkPipelineRasterizationStateCreateInfo
+         * *********************************************** **/
         VkPipelineRasterizationStateCreateInfo rasterizer{};
         rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        // 把光栅化深度超过 near、far 平面的片段(fragment) clamp 到 near、far 的深度
         rasterizer.depthClampEnable = VK_FALSE;
+        // 是否允许几何体通过光栅化阶段，如果设置为 VK_TRUE，则几何体不会被输出到 framebuffer
         rasterizer.rasterizerDiscardEnable = VK_FALSE;
+        // 画点、面、线
         rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
         rasterizer.lineWidth = 1.0f;
+        // 几何体面剔除模式：剔除正面 or 剔除反面
         rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+        // 设置如何确定几何面是否是正面：顺时针面 or 逆时针面
         rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+        // 计算几何体的深度时，光栅化允许对深度做一些修改，比如把深度偏移一部分(主要是为了支持 shadowMap)
         rasterizer.depthBiasEnable = VK_FALSE;
 
+        /** **********************************************
+         * 配置抗锯齿。锯齿出现在几何体的边上，多个几何体面被映射到同一个像素，就会出现锯齿
+         *
+         * VkPipelineMultisampleStateCreateInfo
+         * 配置硬件渲染管线抗锯齿，此处没有开启
+         * *********************************************** **/
         VkPipelineMultisampleStateCreateInfo multisampling{};
         multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
         multisampling.sampleShadingEnable = VK_FALSE;
         multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
+        /** **********************************************
+         * 配置颜色混合。即 fragment shader 输出的值和 framebuffer 已存在的值经过计算得到新值，
+         * 这个步骤就是 Color blending
+         *
+         * VkPipelineColorBlendAttachmentState
+         * 该类用来配置每一个 framebuffer 的 ColorBlending
+         * *********************************************** **/
         VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+        // 设置要修改 RGBA 哪个通道
         colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
         colorBlendAttachment.blendEnable = VK_FALSE;
 
+
+        /** **********************************************
+         * 配置颜色混合。即 fragment shader 输出的值和 framebuffer 已存在的值经过计算得到新值，
+         * 这个步骤就是 Color blending
+         *
+         * VkPipelineColorBlendStateCreateInfo
+         * 配置全局默认的 ColorBlending。例如存在多个 framebuffer 的情况，如果不想为每个 framebuffer 单独配置
+         * VkPipelineColorBlendAttachmentState，则只用配置 VkPipelineColorBlendStateCreateInfo 就能设置
+         * 所有 framebuffer 的默认 ColorBlending。
+         * 不过此处，管理了两种 ColorBlending 设置方式。
+         * *********************************************** **/
         VkPipelineColorBlendStateCreateInfo colorBlending{};
         colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
         colorBlending.logicOpEnable = VK_FALSE;
@@ -512,15 +563,31 @@ private:
         colorBlending.blendConstants[2] = 0.0f;
         colorBlending.blendConstants[3] = 0.0f;
 
+        /** **********************************************
+         * 配置 Viewport 信息。此处将 pipeline 中的 viewport 信息配置为动态可修改，
+         *
+         * VkPipelineDynamicStateCreateInfo
+         * 即 pipeline state 创建好后，viewport 部分可以在绘制时动态配置
+         * *********************************************** **/
         std::vector<VkDynamicState> dynamicStates = {
                 VK_DYNAMIC_STATE_VIEWPORT,
                 VK_DYNAMIC_STATE_SCISSOR
         };
         VkPipelineDynamicStateCreateInfo dynamicState{};
         dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+        // 配置有几个需要动态配置的项
         dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+        // 配置项目数据
         dynamicState.pDynamicStates = dynamicStates.data();
 
+        /** **********************************************
+         * 创建 Pipeline layout 以确定管线中要用到那些 uniform。
+         * uniform 类似于 DynamicState，可以在绘制运行时动态修改。uniform 最广泛
+         * 的用途是给 VertexShader 在运行时设置 MVP 矩阵这种 uniform。
+         *
+         * VkPipelineLayout
+         * 此处着色器没有任何 uniform，所以 VkPipelineLayout 没有配置 uniform 格式
+         * *********************************************** **/
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = 0;
