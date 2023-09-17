@@ -385,22 +385,63 @@ private:
     }
 
     void createRenderPass() {
+        /** **********************************************
+         * RenderPass 指定硬件渲染管线渲染的结果输出到哪个 ImageView 缓冲
+         *
+         * RenderPass 告诉 pipeline 要把哪些 ImageView 作为 color、depth buffer，
+         * 比如：color 渲染结果会被输出到 ImageView A；depth buffer 会被输出到 ImageView B 上。
+         * *********************************************** **/
+
+
+        /** **********************************************
+         * VkAttachmentDescription 用来告诉硬件渲染管线把渲染结果写入 ImageView 时该如何写入
+         *
+         * 此处 VkAttachmentDescription 是用来描述 Color buffer 的写入
+         * *********************************************** **/
         VkAttachmentDescription colorAttachment{};
+        // 描述 buffer 内数据格式，此处直接使用交换缓冲的数据格式
         colorAttachment.format = swapChainImageFormat;
+        // 不做 multisampling
         colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        // 对 buffer 执行任何操作之前，把像素内容清除
         colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        // 定义对 buffer 做写入时的操作：物质基础
         colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        // 引入了 stencil buffer 的概念，后续代码不涉及到对 stencil buffer 的操作，所以此处不做处理
         colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        // 描述 VkImageView 的格式。因为对 VkImage 做的任何操作都需要和其格式相匹配
         colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
+        /** **********************************************
+         * VkAttachmentReference 用于引用 VkAttachmentDescription
+         *
+         * 定义的 VkAttachmentDescription 存放于一个数组内，
+         * VkAttachmentReference 保存数组的下标用于引用 VkAttachmentDescription
+         * *********************************************** **/
         VkAttachmentReference colorAttachmentRef{};
+        // 下标：数组内只有一个 VkAttachmentReference，所以下标为 0
         colorAttachmentRef.attachment = 0;
+        // 描述引用的 VkAttachmentDescription 格式，此处表示被引用的 Attachment 将用作 color buffer
         colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+        /** **********************************************
+         * VkSubpassDescription 描述一个渲染过程 (RenderPass) 中的一个子阶段
+         *
+         * 一个渲染过程中可能要做很多渲染操作，这些渲染操作用 VkSubpassDescription 描述，
+         * 且 Vulkan 中定义的 Subpass 内是并行的，Subpass 之间是串行的，即不同 Subpass 之间
+         * 有依赖关系。
+         *
+         * Subpass 用 pColorAttachments 引用输出到 color buffer 的数组地址，
+         * 在 Shader 着色器中，用这个指令 layout(location = 0) out vec4 outColor; 来描述
+         * 渲染结果输出到的 color buffer 在 pCColorAttachments 数组中的索引位置
+         * *********************************************** **/
         VkSubpassDescription subpass{};
+        // 表示这个子渲染过程用于图形渲染 (graphics)
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        // 表示此 Subpass 的 color buffer 要引用哪个 Attachment，
+        // 且是通过之前定义的 VkAttachmentReference 来引用的
         subpass.colorAttachmentCount = 1;
         subpass.pColorAttachments = &colorAttachmentRef;
 
@@ -412,10 +453,20 @@ private:
         dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
+        /** **********************************************
+         * VkRenderPass 渲染管线中的一个渲染过程
+         *
+         * 之前的代码已经准备好了如下资源：
+         * 1. Attachment
+         * 2. Subpass
+         * 接下来就要把这些资源作为参数来创建一个 RenderPass
+         * *********************************************** **/
         VkRenderPassCreateInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        // 设置 Attachment数组地址和数组长度，这个就是前面定义 VkAttachmentReference 时要引用到的数组
         renderPassInfo.attachmentCount = 1;
         renderPassInfo.pAttachments = &colorAttachment;
+        // 设置 RenderPass 包含的 Subpass
         renderPassInfo.subpassCount = 1;
         renderPassInfo.pSubpasses = &subpass;
         renderPassInfo.dependencyCount = 1;
