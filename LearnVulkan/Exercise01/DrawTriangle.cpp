@@ -2,6 +2,13 @@
 // Created by StormPhoenix on 2023/9/4.
 //
 
+/** ***************************************************
+ * 参考文献：
+ * 《关于 Vulkan Tutorial 中同步问题的解释》 https://zhuanlan.zhihu.com/p/350483554
+ * 这篇文章讲 vulkan 中同步异步，提出了三个重要概念的区别：command、 operation、 pipeline stage。Command 包含了许多 operation，
+ * 每个 operation 的执行需要位于某个 pipeline stage 上。信号量就是一种 operation，等待信号量就是要等待某个 pipeline stage 执行的完成。
+ */
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -445,6 +452,16 @@ private:
         subpass.colorAttachmentCount = 1;
         subpass.pColorAttachments = &colorAttachmentRef;
 
+        /** **********************************************
+         * VkSubpassDependency 理解起来至少包含三个概念：
+         * 1. Pass 执行流程
+         * 2. Stage 阶段
+         * 3. Access 执行动作
+         * 这三个概念合起来就是：某个 Pass 在某个阶段做了某个操作。
+         * 那么 VkSubpassDependency 的作用就是：只有当 Pass A 在某个阶段完成了某个操作之后，才能对 image 的
+         * 格式做自动转换，使得 Pass B 的某个阶段的某个操作可以继续进行。其中 image 变换前后的格式由 Pass A 定义的输出格式
+         * 和 Pass B 定义的输入格式决定。
+         */
         VkSubpassDependency dependency{};
         dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
         dependency.dstSubpass = 0;
@@ -787,9 +804,17 @@ private:
         vkResetFences(device, 1, &inFlightFence);
 
         uint32_t imageIndex;
+        /*
+         * 从 swapChain 中拿到 image 的索引，之后，vulkan 的绘制结果将被输出到该 image 上用于屏幕展示。
+         * 此时 image 可能还在被读取使用，所以不能立马对 image 做写操作，因此传入了信号量参数 imageAvailableSemaphore 保证读取写入的同步
+         * */
         vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
 
         vkResetCommandBuffer(commandBuffer, /*VkCommandBufferResetFlagBits*/ 0);
+
+        /*
+         * 开始记录当前帧中要执行的指令，所有指令填充进 CommandBuffer
+         * */
         recordCommandBuffer(commandBuffer, imageIndex);
 
         VkSubmitInfo submitInfo{};
@@ -798,7 +823,20 @@ private:
         VkSemaphore waitSemaphores[] = {imageAvailableSemaphore};
         VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
         submitInfo.waitSemaphoreCount = 1;
+        /*
+         * 这里的 waitSemaphores 就是之前获取 swapChain 里的 image 设置的信号量，
+         * 用在此处表示 commandBuffer 的执行需要等待 swapChain 里的 image 准备好
+         * */
         submitInfo.pWaitSemaphores = waitSemaphores;
+        /*
+         * pWaitDstStageMash 和 pWaitSemaphores 要配合在一起理解，代表 commandBuffer 被
+         * 提交到 queue 之后会立即执行，运行到 pWaitDstStageMask 阶段被阻塞，直到收到 pWaitSemaphores 信号
+         * 才会继续执行。
+         *
+         * 这样设计是考虑到 commandBuffer 在执行的前一段时间并不会用到 swapChain 里的 image，直到需要写入 image 时
+         * 才会被阻塞。此案例里的 pWaitDstStageMask 设置为 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT，表示
+         * commandBuffer 在执行到颜色输出阶段时才会等待 swapChain 里的 image 准备好。
+         */
         submitInfo.pWaitDstStageMask = waitStages;
 
         submitInfo.commandBufferCount = 1;
