@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.23)
-project(DrawTriangle
+project(01_DrawTriangle
         LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -11,7 +11,7 @@ find_package(Vulkan REQUIRED)
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/Shaders DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(COPY ${CMAKE_SOURCE_DIR}/Scripts DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
-add_executable(${PROJECT_NAME} DrawTriangle.cpp)
+add_executable(${PROJECT_NAME} 01_DrawTriangle.cpp)
 
 add_custom_target(BuildShaders
         COMMAND Scripts/BuildShaders.bat
@@ -22,5 +22,5 @@ add_custom_target(BuildShaders
 
 add_dependencies(${PROJECT_NAME} BuildShaders)
 
-target_link_libraries(DrawTriangle PRIVATE Vulkan::Vulkan)
-target_link_libraries(DrawTriangle PRIVATE glfw)
+target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Vulkan)
+target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
