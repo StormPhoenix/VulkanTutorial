@@ -317,6 +317,10 @@ private:
     }
 
     void createSwapChain() {
+        /** ********************************************
+         * SwapChain 用队列存储了多张 images，这里是多张，而不是一般认为的两张。
+         * 之前一直默认是两张是因为双缓冲概念的影响。
+         */
         SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
 
         VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
