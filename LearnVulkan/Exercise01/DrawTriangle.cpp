@@ -7,6 +7,9 @@
  * 《关于 Vulkan Tutorial 中同步问题的解释》 https://zhuanlan.zhihu.com/p/350483554
  * 这篇文章讲 vulkan 中同步异步，提出了三个重要概念的区别：command、 operation、 pipeline stage。Command 包含了许多 operation，
  * 每个 operation 的执行需要位于某个 pipeline stage 上。信号量就是一种 operation，等待信号量就是要等待某个 pipeline stage 执行的完成。
+ *
+ * Operation 又是什么呢？Operation 是 command 执行过程中的最小单元，运行在不同的 pipeline stage 上，这反过来说明 command 有多个
+ * 运行在不同 pipeline stage 上的最小运行单元组成。在记录 command buffer 过程中的所有 command 都是并行执行在 pipeline stage 上的。
  */
 
 #define GLFW_INCLUDE_VULKAN
@@ -395,8 +398,10 @@ private:
         /** **********************************************
          * RenderPass 指定硬件渲染管线渲染的结果输出到哪个 ImageView 缓冲
          *
-         * RenderPass 告诉 pipeline 要把哪些 ImageView 作为 color、depth buffer，
+         * 1. RenderPass 告诉 pipeline 要把哪些 ImageView 作为 color、depth buffer，
          * 比如：color 渲染结果会被输出到 ImageView A；depth buffer 会被输出到 ImageView B 上。
+         *
+         * 2. RenderPass 在执行时会走完一整个 pipeline stage，每有一个 render pass 就走一次完整的 pipeline stage
          * *********************************************** **/
 
 
@@ -436,13 +441,18 @@ private:
         /** **********************************************
          * VkSubpassDescription 描述一个渲染过程 (RenderPass) 中的一个子阶段
          *
-         * 一个渲染过程中可能要做很多渲染操作，这些渲染操作用 VkSubpassDescription 描述，
+         * 一个渲染过程中要做着色运算，shader 的输出结果由 VkSubpassDescription 描述，
          * 且 Vulkan 中定义的 Subpass 内是并行的，Subpass 之间是串行的，即不同 Subpass 之间
          * 有依赖关系。
          *
          * Subpass 用 pColorAttachments 引用输出到 color buffer 的数组地址，
          * 在 Shader 着色器中，用这个指令 layout(location = 0) out vec4 outColor; 来描述
          * 渲染结果输出到的 color buffer 在 pCColorAttachments 数组中的索引位置
+         *
+         * Subpass 和 RenderPass 的区别：
+         * 1. RenderPass 代表一整个 pipeline 的渲染过程，它定义了当前绘制管线要用到的 framebuffer (输入输出到哪)
+         * 2. SubPass 是 RenderPass 代表的 pipeline 中的一个连续子流程 (连续的 pipeline stage)，它能定义不同
+         * 的 SubPass 之间的依赖关系和依赖的输入输出 framebuffer
          * *********************************************** **/
         VkSubpassDescription subpass{};
         // 表示这个子渲染过程用于图形渲染 (graphics)
@@ -454,13 +464,13 @@ private:
 
         /** **********************************************
          * VkSubpassDependency 理解起来至少包含三个概念：
-         * 1. Pass 执行流程
-         * 2. Stage 阶段
-         * 3. Access 执行动作
-         * 这三个概念合起来就是：某个 Pass 在某个阶段做了某个操作。
-         * 那么 VkSubpassDependency 的作用就是：只有当 Pass A 在某个阶段完成了某个操作之后，才能对 image 的
-         * 格式做自动转换，使得 Pass B 的某个阶段的某个操作可以继续进行。其中 image 变换前后的格式由 Pass A 定义的输出格式
-         * 和 Pass B 定义的输入格式决定。
+         * 1. sub pass 执行流程
+         * 2. stage 阶段
+         * 3. access 执行动作
+         * 这三个概念合起来就是：某个 sub pass 在某个阶段做了某个操作。
+         * 那么 VkSubpassDependency 的作用就是：只有当 sub pass A 在某个阶段完成了某个操作之后，才能对 image 的
+         * 格式做自动转换，使得 sub pass B 的某个阶段的某个操作可以继续进行。其中 image 变换前后的格式由 sub pass A 定义的输出格式
+         * 和 sub pass B 定义的输入格式决定。
          */
         VkSubpassDependency dependency{};
         dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -741,6 +751,7 @@ private:
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
+        // 准备开始记录 command 到 command buffer
         if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
             throw std::runtime_error("failed to begin recording command buffer!");
         }
@@ -756,8 +767,10 @@ private:
         renderPassInfo.clearValueCount = 1;
         renderPassInfo.pClearValues = &clearColor;
 
+        // 记录 command - vkCmdBeginRenderPass
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+        // 记录 command - vkCmdBindPipeline - 设置渲染管线状态
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
         VkViewport viewport{};
@@ -767,17 +780,22 @@ private:
         viewport.height = static_cast<float>(swapChainExtent.height);
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
+        // 记录 command - vkCmdSetViewport
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
         VkRect2D scissor{};
         scissor.offset = {0, 0};
         scissor.extent = swapChainExtent;
+        // 记录 command - vkCmdSetScissor
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
+        // 记录 command - vkCmdDraw
         vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
+        // 记录 command - vkCmdEndRenderPass
         vkCmdEndRenderPass(commandBuffer);
 
+        // 结束记录
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
             throw std::runtime_error("failed to record command buffer!");
         }
@@ -846,6 +864,14 @@ private:
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
+        /** **********************************************
+         * vkQueueSubmit - 提交 graphics queue 中记录的指令
+         *
+         * 需要注意的点：
+         * 0. graphics queue 中的指令由 command buffer 记录；
+         * 1. graphics queue 里的指令提交后在 gpu 异步执行；
+         * 2. graphics queue 指令执行完毕后，激活 inFlightFence 信号；
+         */
         if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFence) != VK_SUCCESS) {
             throw std::runtime_error("failed to submit draw command buffer!");
         }
@@ -980,6 +1006,17 @@ private:
         uint32_t queueFamilyCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 
+        /** ****************************************
+         * Vulkan 中 queue 的设计有其硬件基础的
+         *
+         * 目前我知道的有几种 queue，包括：
+         * 1. transfer queue 用于数据从 cpu 向 gpu 传输;
+         * 2. compute queue 用于执行 compute shader;
+         * 3. graphics queue 用于图形渲染;
+         * 4. presentation queue 渲染结果输出到屏幕;
+         * 这三类管线在硬件上存在，使数据传输、物理图形计算、渲染可以异步进行，提高 cpu、gpu 执行效率。
+         * 参考：《游戏引擎随笔 0x07：现代图形 API 的同步》 https://zhuanlan.zhihu.com/p/100162469
+         */
         std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
