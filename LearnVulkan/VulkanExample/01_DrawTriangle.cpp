@@ -878,7 +878,13 @@ private:
         // 分配好的显存和 vertexBuffer 绑定，后续讲顶点数据保存在这块显存上
         vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
 
-        // 复制顶点数据到 gpu 显存
+        /** ************************************************************************************************************
+         * 复制顶点数据到 gpu 显存
+         *
+         * 思路：复制 cpu 数据到 gpu，需要建立一条从内存到显存的映射，这可通过 vkMapMemory 完成. 但这个操作有前提，就是分配的显存类型必须允许
+         * 与内存数据同步. 这里 vertexBufferMemory 在分配时设置了 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT 标志，表示显存类型要满足和内
+         * 存数据保持同步的要求.
+         * ************************************************************************************************************/
         void *data;
         vkMapMemory(device, vertexBufferMemory, 0, bufferInfo.size, 0, &data);
         memcpy(data, vertices.data(), (size_t) bufferInfo.size);
